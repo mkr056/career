@@ -12,7 +12,7 @@ deploy_prod:
     - tags
 ```
 
-Здесь job `deploy_prod` запустится только при пуше в ветку `main` или при создании git-тега. Во всех остальных случаях GitLab пропустит его без ошибки.
+Здесь job `deploy_prod` запустится только при пуше в ветку `main` или при создании git-тега.
 
 `except` работает зеркально — исключает перечисленные условия.
 
@@ -40,7 +40,7 @@ build_image:
 - Если pipeline запущен из merge request — job появляется в интерфейсе, но требует ручного подтверждения (`when: manual`).  
 - Во всех остальных случаях — job не создаётся (`when: never`).
 
-`rules` работает с предопределёнными переменными (predefined variables) GitLab. Наиболее полезные:
+`rules` работает с предопределёнными переменными GitLab. Наиболее полезные:
 - $CI_COMMIT_BRANCH: Имя текущей ветки
 - $CI_COMMIT_TAG: Имя тега, если pipeline запущен по тегу
 - $CI_PIPELINE_SOURCE: Источник: `push`, `merge_request_event`, `schedule`

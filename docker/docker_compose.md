@@ -141,6 +141,26 @@ services:
 
 Здесь `api` не стартует, пока контейнер `db` не перейдёт в состояние running. Важный нюанс: `depends_on` контролирует только порядок запуска контейнеров, но не ждёт готовности приложения внутри. PostgreSQL может ещё инициализироваться, когда `api` уже пытается подключиться. Для ожидания реальной готовности сервиса используют скрипты типа `wait-for-it` или расширенную форму `depends_on` с условием `condition: service_healthy` — это требует настроенного `healthcheck` у зависимого сервиса.
 
+```yaml
+services:
+  db:
+    image: postgres:15
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    image: my-api
+    depends_on:
+      db:
+        condition: service_healthy
+```
+
+- В `db` — `healthcheck` с командой `pg_isready` (это утилита PostgreSQL «проверить готовность»).
+- В `api` — `depends_on: condition: service_healthy` (ждать пока healthcheck вернёт OK).
+
 # links
 Иногда нужно, чтобы сервис в сети был доступен под альтернативным именем. Для этого существует ключ links:
 
@@ -223,3 +243,62 @@ services:
 ```
 
 Разница важная: `${VAR}` в YAML — это подстановка на уровне Compose при разборе файла. `env_file` — это передача переменных в сам контейнер во время запуска. Оба механизма можно использовать одновременно.
+
+# dev vs production
+Локальная разработка и production хотят разного. Один compose-файл с кучей `if-else` будет адом. Лучшее решение — разделить на несколько файлов.
+
+Базовый файл. `docker-compose.yml` — то что одинаково везде:
+
+```yaml
+services:
+  api:
+    image: myapp:latest
+    environment:
+      DB_HOST: db
+  db:
+    image: postgres:15
+```
+
+Override для разработки. `docker-compose.override.yml` — Compose читает автоматически если найдёт:
+
+```yaml
+services:
+  api:
+    build: .             # пересобирается локально
+    volumes:
+      - .:/app           # bind mount для hot-reload
+    ports:
+      - "8080:8080"
+    environment:
+      LOG_LEVEL: debug
+  db:
+    ports:
+      - "5432:5432"      # доступ с хоста для psql
+    environment:
+      POSTGRES_PASSWORD: dev_password
+```
+
+Запускаете `docker compose up` — Compose объединит базовый и override автоматически.
+
+Файл для production. `docker-compose.prod.yml` — НЕ читается автоматически:
+
+```yaml
+services:
+  api:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 512M
+    restart: always
+  db:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+```
+
+Запуск в проде: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`.
+
+Compose накладывает override на базу:
+- Простые поля (image, command) — заменяются.
+- Списки (ports, volumes) — складываются.
+- Объекты (environment) — сливаются по ключам.

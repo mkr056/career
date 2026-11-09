@@ -1,5 +1,5 @@
 # ReplicaSet
-Представьте — что-то пошло не так c pod'ом. OOM-killer убил процесс. Pod перешёл в Failed. И всё. Pod сам себя не воскрешает. K8s не перезапустит этот конкретный Pod — он просто оставит его в Failed. Сервис лежит. Чтобы Pod восстанавливался — нужна обёртка над ним.
+Представьте — что-то пошло не так c pod'ом. OOM-killer убил процесс. Pod перешёл в Failed. И всё. Pod сам себя не воскрешает. K8s не перезапустит этот конкретный Pod, ведь у голого Pod-а нет контроллера — он просто оставит его в Failed. Сервис лежит. Чтобы Pod восстанавливался — нужна обёртка над ним.
 
 ReplicaSet — это объект который гарантирует: «должно быть N таких Pod'ов в любое время».
 
@@ -24,9 +24,10 @@ spec:
 ```
 
 Что тут:  
-- `replicas: 3` — должно быть 3 Pod'а.  
-- `selector` — как ReplicaSet находит свои Pod'ы (по labels).  
-- `template` — шаблон для создания новых Pod'ов.
+- `replicas` — Желаемое количество Pod-ов  
+- `selector.matchLabels` — По каким меткам ReplicaSet находит «свои» Pod-ы  
+- `template` — шаблон для создания новых Pod'ов
+- `template.metadata.labels`: Метки Pod-а — должны совпадать с `selector.matchLabels`
 
 Что делает ReplicaSet:  
 1. Создаёт 3 Pod'а по шаблону.  
@@ -62,6 +63,7 @@ spec:
       - name: nginx
         image: nginx:1.25
 ```
+
 
 Похоже на ReplicaSet, да? Так и есть — Deployment обёртка над ReplicaSet. Когда вы применяете Deployment:
 1. Создаётся ReplicaSet с указанными настройками.
@@ -106,7 +108,7 @@ spec:
 
 Когда Deployment делает RollingUpdate, у него два рычага: `maxSurge` и `maxUnavailable`.
 
-`maxSurge` — сколько лишних Pod'ов можно поднять. Сколько Pod'ов могут существовать сверх желаемого числа во время обновления.
+`maxSurge` — сколько лишних Pod-ов можно создать сверх `replicas` во время обновления. По умолчанию 25%.
 
 `maxSurge: 1` при `replicas: 3` означает: в момент обновления может быть до 4 Pod'ов (3 + 1 новый).
 
@@ -114,7 +116,7 @@ spec:
 
 Чем больше maxSurge, тем быстрее обновление (поднимаются несколько новых Pod'ов параллельно). Но требует больше ресурсов на нодах в момент обновления.
 
-`maxUnavailable` — сколько Pod'ов может быть недоступно. Сколько Pod'ов могут быть не готовы во время обновления.
+`maxUnavailable` — сколько Pod-ов можно одновременно вывести из строя (абсолютное число или процент). По умолчанию 25%.
 
 `maxUnavailable: 0` при `replicas: 3` означает: в любой момент должно быть готово все 3 Pod'а. K8s не погасит старый Pod пока новый не стал ready. `maxUnavailable: 1` означает: допустимо иметь 2 готовых из 3 (один обновляется). Чем меньше maxUnavailable, тем безопаснее, но медленнее обновление.
 
@@ -122,6 +124,7 @@ spec:
 Безопасная (для критичного prod)
 ```yaml
 strategy:
+  type: RollingUpdate
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
@@ -131,6 +134,7 @@ strategy:
 Быстрая (для dev/staging):
 ```yaml
 strategy:
+  type: RollingUpdate
   rollingUpdate:
     maxSurge: 50%
     maxUnavailable: 25%
@@ -140,6 +144,7 @@ strategy:
 Дефолтная:
 ```yaml
 strategy:
+  type: RollingUpdate
   rollingUpdate:
     maxSurge: 25%
     maxUnavailable: 25%

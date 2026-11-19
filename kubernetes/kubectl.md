@@ -16,6 +16,8 @@ kubectl get deployments,services       # несколько типов сраз�
 
 Посмотреть узлы и их роли можно одной командой: `kubectl get nodes`. В колонке `ROLES` узел Control Plane явно помечен. Worker Node в этой колонке показывают `<none>` — роль рабочего узла подразумевается по умолчанию.
 
+Команда `kubectl get all` выводит список всех основных объектов: Pod, Service, Deployment, ReplicaSet и другие. Каждая строка начинается с типа ресурса, например `pod/nginx-...` или `service/frontend`.
+
 # describe — посмотреть детали
 `kubectl describe pod my-pod`
 
